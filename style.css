@@ -18,3 +18,39 @@ main{overflow-x:clip}
 .game-live-readout{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:7px 16px;font-size:16px;line-height:1.5;border-bottom:1px solid #b2c7cd;padding-bottom:16px;margin-bottom:21px;color:#526878}.game-live-readout>span{white-space:nowrap}.game-live-readout strong,.game-live-readout output{color:var(--ink);font-size:20px;font-weight:500;font-variant-numeric:tabular-nums;letter-spacing:-.03em;margin-left:4px}
 @media (max-width:390px){.hero h1{font-size:clamp(54px,16vw,64px)}}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}.watch-float{transform:rotate(-12deg)}.light-glide{display:none}}
+
+/* Consistent NE → right gesture, never driven by page scroll. */
+.turn-arrow{rotate:none;transform:rotate(0deg);transition:transform .24s ease;pointer-events:none}
+:where(a,button):is(:hover,:focus-visible,:active) .turn-arrow{transform:rotate(45deg)}
+/* Metal, hands and glass respond to the pointer; all controls stay anchored. */
+.pointer-scene{--pointer-x:0;--pointer-y:0}
+.watch-float{translate:calc(var(--pointer-x)*24px) calc(var(--pointer-y)*15px);rotate:calc(var(--pointer-x)*5deg)}
+.light-glide{translate:calc(var(--pointer-x)*110px) calc(var(--pointer-y)*70px);scale:1.15}
+.watch-float::after{content:'';position:absolute;inset:24% 12% 19%;border-radius:50%;background:linear-gradient(115deg,transparent 27%,#edffff6b 49%,transparent 65%);translate:calc(var(--pointer-x)*38px) calc(var(--pointer-y)*20px);opacity:0;transition:opacity .25s;pointer-events:none}
+.hero:is(.pointer-active,.focus-active,.touch-active) .watch-float::after{opacity:.6}
+.workshop .conversation{position:relative}
+.small-dial{translate:calc(var(--pointer-x)*12px) calc(var(--pointer-y)*8px);rotate:calc(var(--pointer-x)*12deg);box-shadow:inset 0 0 0 7px #e1e9e7,calc(var(--pointer-x)*-7px) 7px 0 #123b4c12}
+.small-dial::before{rotate:calc(var(--pointer-x)*85deg)}
+.small-dial::after{rotate:calc(var(--pointer-y)*70deg)}
+.workshop .section-heading{position:relative}
+.workshop .section-heading::after{content:'';position:absolute;bottom:-29px;left:0;width:clamp(110px,18vw,240px);height:4px;background:linear-gradient(90deg,#df5b27,#df5b2700);translate:calc((var(--pointer-x) + 1)*55px) 0;pointer-events:none}
+.topic-buttons button{transition:background .18s,border-color .18s,box-shadow .18s}
+.topic-buttons button:is(:hover,:focus-visible,:active){box-shadow:inset 0 -4px 0 #df5b27;border-color:#df5b27}
+.mechanism-pointer{translate:calc(var(--pointer-x)*33px) calc(var(--pointer-y)*24px);rotate:calc(var(--pointer-x)*5deg);position:relative;pointer-events:none}
+.mechanism-pointer::after{content:'';position:absolute;inset:19% 3% 20%;background:linear-gradient(120deg,transparent 25%,#d0f9ff36 48%,transparent 67%);border-radius:50%;translate:calc(var(--pointer-x)*75px) calc(var(--pointer-y)*40px);opacity:0;transition:opacity .25s;pointer-events:none}
+.mechanism:is(.pointer-active,.focus-active,.touch-active) .mechanism-pointer::after{opacity:1}
+.mechanism-note .note-line{scale:calc(1 + var(--pointer-x)*.3) 1;transform-origin:right center}
+.game-clock{position:relative;isolation:isolate}
+.game-clock::after{content:'';position:absolute;inset:7%;border-radius:50%;pointer-events:none;background:linear-gradient(115deg,transparent 25%,#ffffff94 47%,transparent 70%);translate:calc(var(--pointer-x)*23px) calc(var(--pointer-y)*16px);opacity:0;transition:opacity .25s}
+.time-game:is(.pointer-active,.focus-active,.touch-active) .game-clock::after{opacity:.65}
+.game-clock svg{translate:calc(var(--pointer-x)*13px) calc(var(--pointer-y)*8px);pointer-events:none}
+.game-clock-side{background-image:linear-gradient(115deg,#ffffff00 10%,#fffef759 50%,#ffffff00 80%);background-size:160% 100%;background-position:calc(50% + var(--pointer-x)*35%) 50%}
+.game-shell{box-shadow:calc(var(--pointer-x)*-9px) 12px 35px #16334c14}
+.contact-calibre{display:block;width:min(360px,100%);margin-top:32px;fill:none;stroke:#87b7ca;stroke-width:2;stroke-linecap:round;pointer-events:none;translate:calc(var(--pointer-x)*22px) calc(var(--pointer-y)*12px)}
+.calibre-wheel{transform-origin:180px 80px;rotate:calc(var(--pointer-x)*36deg)}
+.calibre-hand{stroke:#ff9765;stroke-width:4;transform-origin:180px 80px;rotate:calc(var(--pointer-y)*25deg)}
+.calibre-bridge{translate:calc(var(--pointer-x)*-12px) 0;opacity:.6}
+.appointment-panel{box-shadow:calc(var(--pointer-x)*-12px) calc(10px + var(--pointer-y)*-5px) 0 #7ed0dd33;transition:box-shadow .12s}
+.appointment-panel:focus-within{box-shadow:7px 7px 0 #ff9765}
+@media(hover:none),(pointer:coarse){.appointment-panel:focus-within{box-shadow:4px 4px 0 #ff9765}.pointer-scene.touch-active .contact-calibre,.pointer-scene.focus-active .contact-calibre{stroke:#bce4ea}}
+@media(prefers-reduced-motion:reduce){.watch-float,.light-glide,.small-dial,.small-dial::before,.small-dial::after,.mechanism-pointer,.game-clock svg,.contact-calibre,.calibre-wheel,.calibre-hand,.calibre-bridge{translate:none!important;rotate:none!important}.watch-float::after,.mechanism-pointer::after,.game-clock::after,.workshop .section-heading::after{translate:none!important}.turn-arrow{transform:rotate(0deg)!important;transition:none!important}:where(a,button):is(:hover,:focus-visible,:active) .turn-arrow{transform:rotate(45deg)!important}}

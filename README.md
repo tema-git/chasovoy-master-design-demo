@@ -36,3 +36,16 @@
 ## Предпросмотр
 
 Из папки сайта: `python3 -m http.server 4320`. Откройте локальный адрес сервера. Для публикации загрузите содержимое папки целиком. `robots.txt` и meta robots закрывают демоверсию от индексирования.
+
+
+## Cursor interaction update — 2026-10-24
+
+All five main sections respond to pointer position through independent decorative layers. Native cursor, selectable text, input positions and click targets remain stable. Motion runs only while a visible scene settles after pointer input, and stops offscreen, on blur, hidden page, pointer mode changes and reduced-motion changes. Touch and keyboard focus receive immediate visual feedback.
+
+Navigation and CTA arrows share one gesture: north-east at rest, horizontal right on hover or keyboard focus. Page scroll never rotates UI arrows; other thematic scroll effects remain. Reduced motion switches arrow direction immediately and disables decorative displacement.
+
+- Hero: watch depth and metallic reflection.
+- Workshop: miniature dial and hands, orange detail line, topic feedback.
+- Mechanism: pointer wrapper moves independently of scroll-driven exploded layers.
+- Game: clock movement and glass reflection, while inputs and hands remain functional.
+- Contact: balance wheel, bridge, hand and form shadow.

@@ -192,59 +192,69 @@
   });
   updateClock();
 
-  function setupPointerMotion() {
-    const scene = document.querySelector('.hero-visual');
-    const watch = scene.querySelector('.watch-float');
-    const light = scene.querySelector('.light-glide');
-    const finePointer = matchMedia('(hover: hover) and (pointer: fine)');
-    let x = 0, y = 0, targetX = 0, targetY = 0, frame = 0, lastTime = 0, bounds = null, visible = false;
-    const allowed = () => finePointer.matches && !reducedMotion.matches && !document.hidden;
-    function render() {
-      watch.style.transform = `translate3d(${x*9}px,${y*7}px,0) rotateX(${-y*6}deg) rotateY(${x*8}deg) rotateZ(${-12+x*3}deg)`;
-      light.style.transform = `translate(${x*55}px,${y*45}px)`;
+  // Pointer motion belongs to decorative layers; text and controls never move.
+  function setupSectionMotion(selectors) {
+    const fine = matchMedia('(hover: hover) and (pointer: fine)');
+    const scenes = selectors.map(selector => ({surface:document.querySelector(selector),x:0,y:0,tx:0,ty:0,frame:0,time:0,rect:null,visible:false}));
+    const allowed = () => fine.matches && !reducedMotion.matches && !document.hidden;
+    function paint(scene) {
+      scene.surface.style.setProperty('--pointer-x',scene.x.toFixed(4));
+      scene.surface.style.setProperty('--pointer-y',scene.y.toFixed(4));
     }
-    function reset() {
-      if(frame) cancelAnimationFrame(frame);
-      frame = 0; lastTime = 0; x = y = targetX = targetY = 0;
-      watch.classList.remove('is-moving'); render();
+    function stop(scene) {
+      cancelAnimationFrame(scene.frame); scene.frame=0; scene.time=0;
+      scene.x=scene.y=scene.tx=scene.ty=0; scene.rect=null;
+      scene.surface.classList.remove('pointer-active','touch-active'); paint(scene);
     }
-    function tick(time) {
-      frame = 0;
-      if(!allowed() || !visible) { reset(); return; }
-      const delta = lastTime ? Math.min(3,(time-lastTime)/16.67) : 1;
-      lastTime = time;
-      const blend = 1-Math.pow(.82,delta);
-      x += (targetX-x)*blend; y += (targetY-y)*blend; render();
-      if(Math.abs(targetX-x)+Math.abs(targetY-y)>.002) frame = requestAnimationFrame(tick);
-      else { x = targetX; y = targetY; render(); watch.classList.remove('is-moving'); lastTime=0; }
+    function tick(scene,time) {
+      scene.frame=0;
+      if(!allowed() || !scene.visible) { stop(scene); return; }
+      const delta=scene.time?Math.min(3,(time-scene.time)/16.67):1; scene.time=time;
+      const ease=1-Math.pow(.78,delta);
+      scene.x+=(scene.tx-scene.x)*ease; scene.y+=(scene.ty-scene.y)*ease;
+      if(Math.abs(scene.tx-scene.x)+Math.abs(scene.ty-scene.y)<.002) {
+        scene.x=scene.tx; scene.y=scene.ty; scene.time=0;
+      } else scene.frame=requestAnimationFrame(time=>tick(scene,time));
+      paint(scene);
     }
-    function schedule() {
-      if(!frame && visible && allowed()) { watch.classList.add('is-moving'); frame=requestAnimationFrame(tick); }
+    function schedule(scene) { if(!scene.frame && allowed() && scene.visible) scene.frame=requestAnimationFrame(time=>tick(scene,time)); }
+    function move(scene,event) {
+      if(!allowed() || !scene.visible || event.pointerType==='touch') return;
+      if(!scene.rect) scene.rect=scene.surface.getBoundingClientRect();
+      scene.tx=Math.max(-1,Math.min(1,(event.clientX-scene.rect.left)/scene.rect.width*2-1));
+      scene.ty=Math.max(-1,Math.min(1,(event.clientY-scene.rect.top)/scene.rect.height*2-1));
+      scene.surface.classList.add('pointer-active'); schedule(scene);
     }
-    function move(event) {
-      if(!allowed() || !visible || event.pointerType==='touch') return;
-      if(!bounds) bounds=scene.getBoundingClientRect();
-      targetX=Math.max(-1,Math.min(1,(event.clientX-bounds.left)/bounds.width*2-1));
-      targetY=Math.max(-1,Math.min(1,(event.clientY-bounds.top)/bounds.height*2-1));
-      schedule();
+    for(const scene of scenes) {
+      scene.surface.classList.add('pointer-scene');
+      scene.surface.addEventListener('pointerenter',event=>{scene.rect=null;move(scene,event);},{passive:true});
+      scene.surface.addEventListener('pointermove',event=>move(scene,event),{passive:true});
+      scene.surface.addEventListener('pointerleave',()=>{scene.rect=null;scene.tx=scene.ty=0;scene.surface.classList.remove('pointer-active');schedule(scene);},{passive:true});
+      scene.surface.addEventListener('pointercancel',()=>stop(scene),{passive:true});
+      scene.surface.addEventListener('focusin',()=>scene.surface.classList.add('focus-active'));
+      scene.surface.addEventListener('focusout',event=>{if(!scene.surface.contains(event.relatedTarget))scene.surface.classList.remove('focus-active');});
+      scene.surface.addEventListener('pointerdown',event=>{if(event.pointerType==='touch')scene.surface.classList.add('touch-active');},{passive:true});
+      scene.surface.addEventListener('pointerup',()=>scene.surface.classList.remove('touch-active'),{passive:true});
     }
-    scene.addEventListener('pointerenter', event => { bounds=scene.getBoundingClientRect(); move(event); });
-    scene.addEventListener('pointermove',move,{passive:true});
-    scene.addEventListener('pointerleave',()=>{targetX=targetY=0;schedule();});
-    scene.addEventListener('pointercancel',reset);
-    window.addEventListener('scroll',()=>{bounds=null;},{passive:true});
-    window.addEventListener('resize',()=>{bounds=null;reset();},{passive:true});
-    window.addEventListener('blur',reset);window.addEventListener('pagehide',reset);
+    if(window.IntersectionObserver) {
+      const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{
+        const scene=scenes.find(item=>item.surface===entry.target);
+        scene.visible=entry.isIntersecting; if(!scene.visible)stop(scene);
+      }));
+      scenes.forEach(scene=>observer.observe(scene.surface));
+    } else scenes.forEach(scene=>scene.visible=true);
+    const reset=()=>scenes.forEach(stop);
+    window.addEventListener('scroll',()=>scenes.forEach(scene=>scene.rect=null),{passive:true});
+    window.addEventListener('resize',reset,{passive:true});
+    window.addEventListener('blur',reset); window.addEventListener('pagehide',reset);
     document.addEventListener('visibilitychange',reset);
-    reducedMotion.addEventListener('change',reset);finePointer.addEventListener('change',reset);
-    new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;if(!visible)reset();}).observe(scene);
+    reducedMotion.addEventListener('change',reset); fine.addEventListener('change',reset);
   }
-  if(window.IntersectionObserver) setupPointerMotion();
+  setupSectionMotion(['.hero','.workshop','.mechanism','.time-game','.contact-section']);
   if(window.gsap && window.ScrollTrigger) {
     gsap.registerPlugin(ScrollTrigger);
     const media = gsap.matchMedia();
     media.add('(prefers-reduced-motion: no-preference)', () => {
-      gsap.to('.turn-arrow',{rotation:540,transformOrigin:'50% 50%',ease:'none',scrollTrigger:{trigger:document.documentElement,start:0,end:'max',scrub:true}});
       gsap.to('.hero .gear-a',{rotation:105,transformOrigin:'50% 50%',ease:'none',scrollTrigger:{trigger:'.hero',start:'top top',end:'bottom top',scrub:true}});
       gsap.to('.hero .gear-b',{rotation:-140,transformOrigin:'50% 50%',ease:'none',scrollTrigger:{trigger:'.hero',start:'top top',end:'bottom top',scrub:true}});
       const mechanism = document.querySelector('.mechanism-scene');
