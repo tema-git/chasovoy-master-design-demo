@@ -98,62 +98,64 @@
   const captureButton = document.querySelector('#capture-moment');
   const momentCard = document.querySelector('#moment-card');
   const modeButtons = [...document.querySelectorAll('[data-hand]')];
-  let hour = 10, minute = 10, selectedHand = 'minute', pointerId = null, frozen = false;
-  const timeText = () => `${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`;
+  const clock = createClockModel();
+  let selectedHand = 'minute', pointerId = null, frozen = false;
+  const timeText = () => clock.read().label;
   function updateClock(part = selectedHand) {
-    hourHand.setAttribute('transform', `rotate(${(hour % 12) * 30 + minute / 2} 250 250)`);
-    minuteHand.setAttribute('transform', `rotate(${minute * 6} 250 250)`);
+    const time = clock.read();
+    hourHand.setAttribute('transform', `rotate(${time.hourAngle} 250 250)`);
+    minuteHand.setAttribute('transform', `rotate(${time.minuteAngle} 250 250)`);
     currentTime.value = timeText();
     dial.setAttribute('aria-label', `Настройка часов. Сейчас ${timeText()}`);
     dial.dataset.hand = part;
     document.querySelector('#active-hand').textContent = frozen ? 'Момент сохранён' : part === 'minute' ? 'Минутная стрелка' : 'Часовая стрелка';
   }
   function releasePointer() {
-    const old = pointerId; pointerId = null;
+    const old = pointerId; pointerId = null; clock.endGesture();
     if(old !== null && dial.hasPointerCapture(old)) dial.releasePointerCapture(old);
     dial.classList.remove('is-dragging');
   }
   function pointTime(event) {
-    if(frozen || (event.pointerType !== 'mouse' && pointerId !== event.pointerId)) return;
+    if(frozen || (pointerId !== null && pointerId !== event.pointerId) || (event.pointerType !== 'mouse' && pointerId !== event.pointerId)) return;
     const rect = dial.getBoundingClientRect();
     const x = event.clientX - rect.left - rect.width / 2;
     const y = event.clientY - rect.top - rect.height / 2;
-    if(Math.hypot(x,y) < rect.width * .1) return;
+    if(Math.hypot(x,y) < rect.width * .1) { clock.endGesture(); return; }
     const angle = (Math.atan2(y,x) * 180 / Math.PI + 450) % 360;
     const part = event.pointerType === 'mouse' ? (pointerId === event.pointerId ? 'hour' : 'minute') : selectedHand;
-    if(part === 'hour') hour = ((Math.round((angle - minute / 2) / 30) % 12 + 12) % 12) || 12;
-    else minute = Math.round(angle / 6) % 60;
+    if(part === 'hour') clock.turnHour(angle);
+    else clock.turnMinute(angle);
     updateClock(part);
     const hint = 'Время следует за вами. Зафиксируйте момент, когда захотите.';
     if(status.textContent !== hint) status.textContent = hint;
   }
   dial.addEventListener('pointermove',pointTime);
+  dial.addEventListener('pointerleave', () => { if(pointerId === null) clock.endGesture(); });
   dial.addEventListener('pointerdown', event => {
-    if(frozen || event.button !== 0 || pointerId !== null) return;
+    if(frozen || event.button !== 0 || event.isPrimary === false || pointerId !== null) return;
     event.preventDefault(); pointerId = event.pointerId;
     dial.setPointerCapture(pointerId); dial.classList.add('is-dragging');
     dial.focus({preventScroll:true}); pointTime(event);
   });
-  dial.addEventListener('pointerup', event => { if(pointerId === event.pointerId) releasePointer(); });
+  dial.addEventListener('pointerup', event => { if(pointerId === event.pointerId) { pointTime(event); releasePointer(); } });
   dial.addEventListener('pointercancel',releasePointer);
   dial.addEventListener('lostpointercapture',releasePointer);
   window.addEventListener('blur',releasePointer);
   document.addEventListener('visibilitychange',() => { if(document.hidden) releasePointer(); });
   function stepTime(delta, part = selectedHand) {
     if(frozen) return;
-    if(part === 'hour') hour = ((hour % 12 + delta + 12) % 12) || 12;
-    else minute = (minute + delta + 60) % 60;
+    releasePointer(); clock.step(delta, part);
     updateClock(part); status.textContent = `Установлено ${timeText()}.`;
   }
   dial.addEventListener('keydown', event => {
     if(!['ArrowLeft','ArrowDown','ArrowRight','ArrowUp','Home'].includes(event.key)) return;
     event.preventDefault(); if(frozen) return;
     const part = event.shiftKey ? 'hour' : selectedHand;
-    if(event.key === 'Home') { if(part === 'hour') hour = 12; else minute = 0; updateClock(part); }
+    if(event.key === 'Home') { releasePointer(); clock.home(part); updateClock(part); }
     else stepTime(['ArrowLeft','ArrowDown'].includes(event.key) ? -1 : 1,part);
   });
   modeButtons.forEach(button => button.addEventListener('click', () => {
-    selectedHand = button.dataset.hand;
+    releasePointer(); selectedHand = button.dataset.hand; clock.endGesture();
     modeButtons.forEach(item => item.setAttribute('aria-pressed',String(item === button)));
     updateClock(); status.textContent = selectedHand === 'hour' ? 'Для касания и клавиатуры выбрана часовая стрелка.' : 'Для касания и клавиатуры выбрана минутная стрелка.';
   }));
@@ -174,7 +176,7 @@
     setFrozen(false); status.textContent = 'Время снова следует за вами.'; dial.focus({preventScroll:true});
   });
   document.querySelector('#game-reset').addEventListener('click',() => {
-    hour = 10; minute = 10; selectedHand = 'minute';
+    clock.reset(); selectedHand = 'minute';
     modeButtons.forEach(button => button.setAttribute('aria-pressed',String(button.dataset.hand === selectedHand)));
     setFrozen(false); status.textContent = 'Снова 10:10. Создайте новый момент.';
   });
