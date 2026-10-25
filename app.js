@@ -90,105 +90,91 @@
     refreshScroll();
   });
 
-  const tasks = [{hour:10,minute:10},{hour:6,minute:30},{hour:8,minute:45}];
-  const gameStart = document.querySelector('#game-start');
-  const gameControls = document.querySelector('#game-controls');
-  const gameCheck = document.querySelector('#game-check');
-  const gameNext = document.querySelector('#game-next');
-  const gameReset = document.querySelector('#game-reset');
-  const gameStatus = document.querySelector('#game-status');
-  const gameVictory = document.querySelector('#game-victory');
-  const hourNumber = document.querySelector('#hours-number');
-  const minuteNumber = document.querySelector('#minutes-number');
-  const hourRange = document.querySelector('#hours-range');
-  const minuteRange = document.querySelector('#minutes-range');
+  const dial = document.querySelector('#dial-control');
   const hourHand = document.querySelector('#hour-hand');
   const minuteHand = document.querySelector('#minute-hand');
-  const progress = document.querySelector('.game-progress');
-  let phase = 'ready', taskIndex = 0, completed = 0, hour = 12, minute = 0;
-  hourNumber.required = true; minuteNumber.required = true;
-  function timeText(h,m) { return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`; }
-  function updateClock() {
+  const currentTime = document.querySelector('#current-time');
+  const status = document.querySelector('#game-status');
+  const captureButton = document.querySelector('#capture-moment');
+  const momentCard = document.querySelector('#moment-card');
+  const modeButtons = [...document.querySelectorAll('[data-hand]')];
+  let hour = 10, minute = 10, selectedHand = 'minute', pointerId = null, frozen = false;
+  const timeText = () => `${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`;
+  function updateClock(part = selectedHand) {
     hourHand.setAttribute('transform', `rotate(${(hour % 12) * 30 + minute / 2} 250 250)`);
     minuteHand.setAttribute('transform', `rotate(${minute * 6} 250 250)`);
-    const current = timeText(hour, minute);
-    document.querySelector('#current-time').value = current;
-    document.querySelector('#control-current').value = current;
-    document.querySelector('#game-dial').setAttribute('aria-label', `Игровые часы показывают ${current}`);
-    hourNumber.value = hour; minuteNumber.value = minute;
-    hourRange.value = hour; minuteRange.value = minute;
-    hourRange.setAttribute('aria-valuetext', `${hour} часов`);
-    minuteRange.setAttribute('aria-valuetext', `${minute} минут`);
+    currentTime.value = timeText();
+    dial.setAttribute('aria-label', `Настройка часов. Сейчас ${timeText()}`);
+    dial.dataset.hand = part;
+    document.querySelector('#active-hand').textContent = frozen ? 'Момент сохранён' : part === 'minute' ? 'Минутная стрелка' : 'Часовая стрелка';
   }
-  function showMessage(message, tone = '') {
-    gameStatus.textContent = message;
-    gameStatus.dataset.tone = tone;
+  function releasePointer() {
+    const old = pointerId; pointerId = null;
+    if(old !== null && dial.hasPointerCapture(old)) dial.releasePointerCapture(old);
+    dial.classList.remove('is-dragging');
   }
-  function focusGame(target) {
-    target.focus({preventScroll:true});
-    target.scrollIntoView({block:'nearest',behavior:'instant'});
+  function pointTime(event) {
+    if(frozen || (event.pointerType !== 'mouse' && pointerId !== event.pointerId)) return;
+    const rect = dial.getBoundingClientRect();
+    const x = event.clientX - rect.left - rect.width / 2;
+    const y = event.clientY - rect.top - rect.height / 2;
+    if(Math.hypot(x,y) < rect.width * .1) return;
+    const angle = (Math.atan2(y,x) * 180 / Math.PI + 450) % 360;
+    const part = event.pointerType === 'mouse' ? (pointerId === event.pointerId ? 'hour' : 'minute') : selectedHand;
+    if(part === 'hour') hour = ((Math.round((angle - minute / 2) / 30) % 12 + 12) % 12) || 12;
+    else minute = Math.round(angle / 6) % 60;
+    updateClock(part);
   }
-  function paintGame() {
-    document.querySelector('#game-round').textContent = phase === 'won' ? 'Все задания выполнены' : `Задание ${taskIndex + 1} из 3`;
-    document.querySelector('#game-score').textContent = `${completed} / 3 готово`;
-    document.querySelector('#target-time').textContent = timeText(tasks[taskIndex].hour,tasks[taskIndex].minute);
-    document.querySelector('#control-target').textContent = timeText(tasks[taskIndex].hour,tasks[taskIndex].minute);
-    progress.setAttribute('aria-valuenow', completed);
-    progress.setAttribute('aria-valuetext', `${completed} из 3 заданий`);
-    progress.firstElementChild.style.transform = `scaleX(${completed / 3})`;
-    gameStart.hidden = phase !== 'ready';
-    gameControls.hidden = phase !== 'playing';
-    gameNext.hidden = phase !== 'solved';
-    gameReset.hidden = phase === 'ready';
-    gameVictory.hidden = phase !== 'won';
-    document.querySelector('#game-help').textContent = phase === 'ready' ? 'Нажмите «Начать настройку». Двигайте ползунки или введите часы и минуты цифрами.' : phase === 'won' ? 'Вы точно выставили время во всех трёх заданиях.' : 'Двигайте ползунки или введите часы и минуты цифрами. Затем проверьте время.';
-    refreshScroll();
-  }
-  gameStart.addEventListener('click', event => {
-    if(phase !== 'ready') return;
-    phase = 'playing'; paintGame();
-    showMessage('Настройте часы на 10:10 и нажмите «Проверить время».');
-    if(event.detail === 0) focusGame(hourNumber);
+  dial.addEventListener('pointermove',pointTime);
+  dial.addEventListener('pointerdown', event => {
+    if(frozen || event.button !== 0 || pointerId !== null) return;
+    event.preventDefault(); pointerId = event.pointerId;
+    dial.setPointerCapture(pointerId); dial.classList.add('is-dragging');
+    dial.focus({preventScroll:true}); pointTime(event);
   });
-  gameStart.disabled = false;
-  function changeTime(control, part) {
-    if(phase !== 'playing') return;
-    const value = control.valueAsNumber;
-    if(!Number.isFinite(value) || !Number.isInteger(value) || value < Number(control.min) || value > Number(control.max)) return;
-    if(part === 'hour') hour = value; else minute = value;
-    updateClock();
-    if(gameStatus.dataset.tone === 'error') showMessage('Стрелки переместились. Проверьте время, когда будете готовы.');
+  dial.addEventListener('pointerup', event => { if(pointerId === event.pointerId) releasePointer(); });
+  dial.addEventListener('pointercancel',releasePointer);
+  dial.addEventListener('lostpointercapture',releasePointer);
+  window.addEventListener('blur',releasePointer);
+  document.addEventListener('visibilitychange',() => { if(document.hidden) releasePointer(); });
+  function stepTime(delta, part = selectedHand) {
+    if(frozen) return;
+    if(part === 'hour') hour = ((hour % 12 + delta + 12) % 12) || 12;
+    else minute = (minute + delta + 60) % 60;
+    updateClock(part); status.textContent = `Установлено ${timeText()}.`;
   }
-  [[hourRange,'hour'],[minuteRange,'minute'],[hourNumber,'hour'],[minuteNumber,'minute']].forEach(([control,part]) => {
-    control.addEventListener('input', () => changeTime(control,part));
+  dial.addEventListener('keydown', event => {
+    if(!['ArrowLeft','ArrowDown','ArrowRight','ArrowUp','Home'].includes(event.key)) return;
+    event.preventDefault(); if(frozen) return;
+    const part = event.shiftKey ? 'hour' : selectedHand;
+    if(event.key === 'Home') { if(part === 'hour') hour = 12; else minute = 0; updateClock(part); }
+    else stepTime(['ArrowLeft','ArrowDown'].includes(event.key) ? -1 : 1,part);
   });
-  gameCheck.addEventListener('click', event => {
-    if(phase !== 'playing') return;
-    if(!hourNumber.reportValidity() || !minuteNumber.reportValidity()) return;
-    hour = hourNumber.valueAsNumber; minute = minuteNumber.valueAsNumber; updateClock();
-    const target = tasks[taskIndex];
-    if(hour !== target.hour || minute !== target.minute) {
-      showMessage(`Сейчас ${timeText(hour,minute)}, а нужно ${timeText(target.hour,target.minute)}. Попробуйте ещё раз — время у вас есть.`, 'error');
-      return;
-    }
-    completed = taskIndex + 1;
-    phase = completed === tasks.length ? 'won' : 'solved';
-    paintGame();
-    showMessage(phase === 'won' ? 'Точно! Все три задания выполнены. Можно начать заново.' : `Верно! ${timeText(target.hour,target.minute)}. ${completed} из 3 заданий выполнено.`, 'success');
-    if(event.detail === 0) focusGame(phase === 'won' ? gameReset : gameNext);
+  modeButtons.forEach(button => button.addEventListener('click', () => {
+    selectedHand = button.dataset.hand;
+    modeButtons.forEach(item => item.setAttribute('aria-pressed',String(item === button)));
+    updateClock(); status.textContent = selectedHand === 'hour' ? 'Для касания и клавиатуры выбрана часовая стрелка.' : 'Для касания и клавиатуры выбрана минутная стрелка.';
+  }));
+  document.querySelector('#dial-back').addEventListener('click',() => stepTime(-1));
+  document.querySelector('#dial-forward').addEventListener('click',() => stepTime(1));
+  function setFrozen(value) {
+    releasePointer(); frozen = value; dial.classList.toggle('is-frozen',value);
+    captureButton.hidden = value; momentCard.hidden = !value;
+    document.querySelectorAll('.dial-modes button,.dial-steps button').forEach(button => button.disabled = value);
+    updateClock(); refreshScroll();
+  }
+  captureButton.addEventListener('click',() => {
+    document.querySelector('#saved-time').textContent = timeText(); setFrozen(true);
+    status.textContent = `Ваш момент ${timeText()} сохранён на экране. Можно продолжить или начать заново.`;
+    document.querySelector('#continue-moment').focus({preventScroll:true});
   });
-  gameNext.addEventListener('click', event => {
-    if(phase !== 'solved') return;
-    taskIndex += 1; phase = 'playing'; hour = 12; minute = 0;
-    updateClock(); paintGame();
-    showMessage(`Следующий момент — ${timeText(tasks[taskIndex].hour,tasks[taskIndex].minute)}. Настройте стрелки.`);
-    if(event.detail === 0) focusGame(hourNumber);
+  document.querySelector('#continue-moment').addEventListener('click',() => {
+    setFrozen(false); status.textContent = 'Время снова следует за вами.'; dial.focus({preventScroll:true});
   });
-  gameReset.addEventListener('click', event => {
-    phase = 'ready'; taskIndex = 0; completed = 0; hour = 12; minute = 0;
-    updateClock(); paintGame();
-    showMessage('Начнём с чистого циферблата. Нажмите «Начать настройку».');
-    if(event.detail === 0) focusGame(gameStart);
+  document.querySelector('#game-reset').addEventListener('click',() => {
+    hour = 10; minute = 10; selectedHand = 'minute';
+    modeButtons.forEach(button => button.setAttribute('aria-pressed',String(button.dataset.hand === selectedHand)));
+    setFrozen(false); status.textContent = 'Снова 10:10. Создайте новый момент.';
   });
   updateClock();
 
