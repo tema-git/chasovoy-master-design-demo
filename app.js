@@ -124,6 +124,8 @@
     if(part === 'hour') hour = ((Math.round((angle - minute / 2) / 30) % 12 + 12) % 12) || 12;
     else minute = Math.round(angle / 6) % 60;
     updateClock(part);
+    const hint = 'Время следует за вами. Зафиксируйте момент, когда захотите.';
+    if(status.textContent !== hint) status.textContent = hint;
   }
   dial.addEventListener('pointermove',pointTime);
   dial.addEventListener('pointerdown', event => {
